@@ -648,6 +648,7 @@ def load_image(self, index):
         img = cv2.imread(path)  # BGR
         assert img is not None, 'Image Not Found ' + path
         h0, w0 = img.shape[:2]  # orig hw
+
         sz = self.crop if self.crop>0 else self.img_size
         r = sz / max(h0, w0)  # resize image to img_size
 
@@ -773,7 +774,6 @@ def load_mosaic(self, index):
         padh = y1a - y1b
 
         # Labels
-        # labels, segments = self.labels[index].copy(), self.segments[index].copy()
         if labels.size:
             labels[:, 1:] = xywhn2xyxy(labels[:, 1:], w, h, padw, padh)  # normalized xywh to pixel xyxy format
             segments = [xyn2xy(x, w, h, padw, padh) for x in segments]
