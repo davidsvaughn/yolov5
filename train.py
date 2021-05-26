@@ -295,13 +295,12 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
     scaler = amp.GradScaler(enabled=cuda)
     compute_loss = ComputeLoss(model)  # init loss class
 
+    ###### resuming training run..... #########################################
     if init_epochs>0:
         nw = -1
         print('Stepping lr_scheduler forward {} epochs...'.format(init_epochs))
     for i in range(init_epochs-1):
         scheduler.step()
-    
-    ##########################################################################
     if init_epochs>0 and rank in [-1, 0]:  # check initial model performance....
         test.test(opt.data,
                 batch_size=test_batch_size,
@@ -314,7 +313,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
                 plots=False,
                 log_imgs=opt.log_imgs if wandb else 0,
                 compute_loss=compute_loss)
-    ##########################################################################
+    ###########################################################################
 
     logger.info(f'Image sizes {imgsz} train, {imgsz_test} test\n'
                 f'Using {dataloader.num_workers} dataloader workers\n'
@@ -340,10 +339,6 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
         # Update mosaic border
         # b = int(random.uniform(0.25 * imgsz, 0.75 * imgsz + gs) // gs * gs)
         # dataset.mosaic_border = [b - imgsz, -b]  # height, width borders
-
-        ## clear CUDA cache...
-        # gc.collect()
-        # torch.cuda.empty_cache()
 
         mloss = torch.zeros(4, device=device)  # mean losses
         if rank != -1:
@@ -407,7 +402,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
                 s = ('%10s' * 2 + '%10.4g' * 6) % (
                     '%g/%g' % (epoch, epochs - 1), mem, *mloss, targets.shape[0], 
                     imgs_sec ## #images/sec
-                    )
+                )
                 pbar.set_description(s)
 
                 # Plot
