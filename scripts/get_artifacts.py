@@ -28,35 +28,33 @@ It will arrange the files in the same structure as 'training_start.py' script in
 # MANIFEST_URL    = 's3://ph-dvaughn-dev/fpl_thermal_hotspot/manifest.txt'
 # MODEL_BUCKET    = 's3://ai-inference-dev-model-catalog/model/yolo-v5-full-scale/fpl-thermal-hotspot-1/'
 
-## FPL RGB Component - March-29
-# DATA_DIR        = '/home/david/code/repo/ai_docker/datasets/fpl/component'
-# MANIFEST_URL    = 's3://ai-labeling/FPL/components/march_29th_2021/machine_labeled_fci_compression_splice/model_training_files/manifest.txt'
-# MODEL_BUCKET    = 's3://ai-inference-dev-model-catalog/model/yolo-v5-full-scale/march-29-yolo-L-components/'
-
-## FPL RGB Component - April-22
-DATA_DIR        = '/home/david/code/repo/ai_docker/datasets/fpl/component'
-MANIFEST_URL    = 's3://ai-inference-dev-model-catalog/model/yolo-v5-full-scale/April-22-yolo-L-components-augmentation/manifest.txt'
-MODEL_BUCKET    = 's3://ai-inference-dev-model-catalog/model/yolo-v5-full-scale/April-22-yolo-L-components-augmentation/'
-
 ## FPL RGB Damage
 # DATA_DIR        = '/home/david/code/repo/ai_docker/datasets/fpl/damage/rgb/may11'
 # MANIFEST_URL    = 's3://ai-inference-dev-model-catalog/model/yolo-v5-full-scale/fpl-component-damage-may11/manifest.txt'
 # MODEL_BUCKET    = 's3://ai-inference-dev-model-catalog/model/yolo-v5-full-scale/fpl-component-damage-may11/'
 # LABEL_FILTER = [0,2,4,8]
-# LABEL_FILTER = [6]
-
-## FPL RGB Damage
-# DATA_DIR        = '/home/david/code/repo/ai_docker/datasets/fpl/damage/rgb/stage1b'
-# MANIFEST_URL    = 's3://ai-inference-dev-model-catalog/model/yolo-v5-full-scale/fpl-rgb-damage-stage1b-large/manifest.txt'
-# MODEL_BUCKET    = 's3://ai-inference-dev-model-catalog/model/yolo-v5-full-scale/fpl-rgb-damage-stage1b-large/'
-# # LABEL_FILTER = [6,7,11,15,16,17,18,19,20]
 # S3_FILTER = ['original-labels'] # must contain AT LEAST ONE of list
+
+## FPL RGB Component - April-22
+# DATA_DIR        = '/home/david/code/phawk/data/fpl/component'
+# MODEL_BUCKET    = 's3://ai-inference-dev-model-catalog/model/yolo-v5-full-scale/fpl-comp-1536-3008-yolov5l6-june10/'
+
+## FPL RGB Component - july8
+DATA_DIR        = '/home/david/code/phawk/data/fpl/component'
+MODEL_DIR       = '/home/david/code/phawk/data/fpl/component/models/july8'
+MODEL_BUCKET    = 's3://ai-inference-dev-model-catalog/model/yolo-v5-full-scale/fpl-comp-1408-3008-yolov5l6-july8/'
+
+## FPL RGB Component - july11
+# DATA_DIR        = '/home/david/code/phawk/data/fpl/component'
+# MODEL_DIR       = '/home/david/code/phawk/data/fpl/component/models/july11'
+# MODEL_BUCKET    = 's3://ai-inference-dev-model-catalog/model/yolo-v5-full-scale/fpl-comp-1408-3008-yolov5l6-july11/'
 
 
 #-----------------------------------------------
 IMG_DIR = '{}/images'.format(DATA_DIR)
 LAB_DIR = '{}/labels'.format(DATA_DIR)
 if MODEL_BUCKET:
+    MANIFEST_URL    = MODEL_BUCKET + 'manifest.txt'
     MODEL_WTS_URL   = MODEL_BUCKET + 'weights.pt'
     CFG_URL         = MODEL_BUCKET + 'hyp.yaml'
     CAT_URL         = MODEL_BUCKET + 'categories.json'
@@ -72,6 +70,9 @@ if LABEL_FILTER is not None:
 
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
+    
+if not os.path.exists(MODEL_DIR):
+    os.makedirs(MODEL_DIR)
     
 if not os.path.exists(IMG_DIR):
     os.makedirs(IMG_DIR)
@@ -199,8 +200,8 @@ def write_set(set_path, img_set):
         for entry in img_set:
             f.write(f'{IMG_DIR}/{entry.image_file_name()}\n')
             
-def write_coco_names(categories):
-    coco_names_filename = f'{DATA_DIR}/coco.names'
+def write_coco_names(categories, dst_dir=DATA_DIR):
+    coco_names_filename = f'{dst_dir}/coco.names'
     if os.path.exists(coco_names_filename):
         os.remove(coco_names_filename)
     labels = []
@@ -211,14 +212,14 @@ def write_coco_names(categories):
             f.write(f'{name}\n')
     return labels
 
-def write_data_yaml(labels):
-    data_yaml_filename = f"{DATA_DIR}/data.yaml"
+def write_data_yaml(labels, dst_dir=DATA_DIR):
+    data_yaml_filename = f"{dst_dir}/data.yaml"
     if os.path.exists(data_yaml_filename):
         os.remove(data_yaml_filename)
     with open(data_yaml_filename, 'a') as f:
         # f.write(f"train: {DATA_DIR}/train.txt\n")
-        f.write(f"val: {DATA_DIR}/val.txt\n")
-        f.write(f"test: {DATA_DIR}/test.txt\n\n")
+        f.write(f"val: {dst_dir}/val.txt\n")
+        f.write(f"test: {dst_dir}/test.txt\n\n")
         f.write(f'# Number of classes in dataset:\nnc: {len(labels)}\n\n')
         f.write(f'# Class names:\nnames: {json.dumps(labels)}')
 
@@ -226,19 +227,29 @@ def write_data_yaml(labels):
 
 if __name__ == "__main__":
     
-    manifest_path = download_s3_file(MANIFEST_URL, overwrite=True)
-    train_set, val_set, test_set, _ = parse_manifest(manifest_path)
+    manifest_path = download_s3_file(MANIFEST_URL, dst_dir=MODEL_DIR, overwrite=False)# True
+    train_set, val_set, test_set, all_set = parse_manifest(manifest_path)
+    
+    ## remove leakage!!!
+    train = [ntpath.split(e.s3Url)[1] for e in train_set]
+    val = [ntpath.split(e.s3Url)[1] for e in val_set]
+    test = [ntpath.split(e.s3Url)[1] for e in test_set]
+    idx_val = np.where(~np.in1d(val, train))[0]
+    idx_test = np.where(~np.in1d(test, train))[0]
+    val_set = [val_set[i] for i in idx_val]
+    test_set = [test_set[i] for i in idx_test]
+    # sys.exit()
     
     if CAT_URL:
-        categories_path = download_s3_file(CAT_URL, overwrite=True)
+        categories_path = download_s3_file(CAT_URL, dst_dir=MODEL_DIR, overwrite=True)
         categories = parse_categories(categories_path)
-        labels = write_coco_names(categories)
-        write_data_yaml(labels)
+        labels = write_coco_names(categories, dst_dir=MODEL_DIR)
+        write_data_yaml(labels, dst_dir=MODEL_DIR)
         
     if MODEL_BUCKET:
-        model_path = download_s3_file(MODEL_WTS_URL, overwrite=True)
-        cfg_path = download_s3_file(CFG_URL, overwrite=True)
-        download_s3_file(TESTLOG_URL, filename='testlog.txt', overwrite=True)
+        model_path = download_s3_file(MODEL_WTS_URL, dst_dir=MODEL_DIR, overwrite=False)# True
+        cfg_path = download_s3_file(CFG_URL, dst_dir=MODEL_DIR, overwrite=True)
+        download_s3_file(TESTLOG_URL, dst_dir=MODEL_DIR, filename='testlog.txt', overwrite=True)
     
     img_sets = []
     img_sets.append((test_set, 'test'))
@@ -265,5 +276,5 @@ if __name__ == "__main__":
         
         ## save image filenames to file
         write_labels(img_set)
-        img_set_path = f'{DATA_DIR}/{name}.txt'
+        img_set_path = f'{MODEL_DIR}/{name}.txt'
         write_set(img_set_path, img_set)
